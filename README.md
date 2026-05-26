@@ -23,15 +23,19 @@ and category-based reporting.
 - python-dotenv
 
 ## Setup
+
 ```bash
 git clone https://github.com/Jkris0917/flask-expense-api
 cd flask-expense-api
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-```
-# Create a .env file with:
+
+# Create a .env file:
 # DATABASE_URL=postgresql://postgres:PASSWORD@localhost:5432/expense_tracker
+
+python app.py
+```
 
 ## What I learned
 
