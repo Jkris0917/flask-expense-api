@@ -16,22 +16,22 @@ and category-based reporting.
 | GET | `/summary` | Totals and category breakdown |
 
 ## Tech stack
-
 - Python 3.12
 - Flask
-- JSON file persistence
+- PostgreSQL
+- Flask-SQLAlchemy
 - python-dotenv
 
 ## Setup
-
 ```bash
-git clone https://github.com/jkris0917/flask-expense-api
+git clone https://github.com/Jkris0917/flask-expense-api
 cd flask-expense-api
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-python app.py
 ```
+# Create a .env file with:
+# DATABASE_URL=postgresql://postgres:PASSWORD@localhost:5432/expense_tracker
 
 ## What I learned
 

@@ -1,21 +1,31 @@
 from flask import Flask,jsonify,request
-from models import ExpenseManager
+from models import db,Expense
 from dotenv import load_dotenv
+from sqlalchemy import func
 import os
 
 load_dotenv()
 app = Flask(__name__)
-manager = ExpenseManager(filename=os.getenv("DATA_FILE","data.json"))
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app)
+
+with app.app_context():
+    db.create_all()
+
 
 @app.route('/expenses', methods=["GET"])
 def get_all():
-    return jsonify([e.to_dict() for e in manager.get_all()]), 200
+    expenses = Expense.query.all()
+    return jsonify([e.to_dict() for e in expenses]), 200
 
 @app.route("/expenses/<int:id>", methods=["GET"])
 def get_one(id):
-    expense = manager.get_by_id(id)
+    expense = Expense.query.get(id)
     if expense is None:
-        return jsonify({"message": f"Expense {id} not found"}), 404
+        return jsonify({"error": f"Expense {id} not found"}), 404
     return jsonify(expense.to_dict()),200
 
 @app.route("/expenses", methods=["POST"])
@@ -35,13 +45,22 @@ def add_expense():
     except ValueError:
         return jsonify({"error": "Amount must be a number"}), 400
     
-    expense = manager.add(data['category'],amount, data.get("note"))
+    expense = Expense(
+        category=data['category'],
+        amount=amount, 
+        note=data.get("note")
+    )
+    db.session.add(expense)
+    db.session.commit()
     return jsonify(expense.to_dict()),201
 
 @app.route("/expenses/<int:id>", methods=["PUT"])
 def update_expense(id):
-    data = request.get_json()
+    expense = Expense.query.get(id)
+    if expense is None:
+        return jsonify({"error": f"Expense {id} not found"}), 404
     
+    data = request.get_json()
     if not data:
         return jsonify({"message": "No JSON body provided"}), 400
     
@@ -52,30 +71,43 @@ def update_expense(id):
                 return jsonify({"error": "Amount must be positive"}), 400
         except ValueError:
             return jsonify({"error": "Amount must be a number"}), 400
-    result = manager.update(
-        id,
-        category=data.get('category'),
-        amount=data.get('amount'), 
-        note=data.get('note')
-        )
-    if result is None:
-        return jsonify({"error":f"Expense {id} not found"}), 404
-    return jsonify(result.to_dict()), 200
+        
+    if "category" in data:
+        expense.category = data["category"]
+        
+    if "note" in data:
+        expense.note = data["note"]
+    
+    db.session.commit()
+    return jsonify(expense.to_dict()), 200
 
 @app.route("/expenses/<int:id>", methods=["DELETE"])
 def delete_expense(id):
-    deleted = manager.delete(id)
-    if not deleted:
+    expense = Expense.query.delete(id)
+    if expense is None:
         return jsonify({"error": f"Expense {id} not found"}), 404
+    
+    db.session.delete(expense)
+    db.session.commit()
     return jsonify({"message": "Deleted successfully", "id":id}) ,200
 
-@app.route("/summary",methods=['GET'])
+@app.route("/summary", methods=['GET'])
 def summary():
+    results = db.session.query(
+        Expense.category,
+        func.sum(Expense.amount)
+    ).group_by(Expense.category).all()
+
+    by_category = {row[0]: row[1] for row in results}
+
+    total_expenses = Expense.query.count()       
+    total_amount = sum(by_category.values())      
+
     return jsonify({
-        "total_expenses": len(manager.get_all()),
-        "total_amount": manager.total(),
-        "by_category": manager.by_category()
-    }),200
+        "total_expenses": total_expenses,
+        "total_amount": total_amount,
+        "by_category": by_category
+    }), 200
     
 if __name__ == "__main__":
     app.run(debug=True)
